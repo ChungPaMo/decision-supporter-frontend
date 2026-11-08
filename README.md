@@ -8,7 +8,7 @@
 
 ### 1. 데이터 등록·승인
 
-![데이터 등록·승인 화면](docs/screenshots/01-data-upload.png)
+![데이터 등록·승인 화면](docs/screenshots/01-data-registration.png)
 
 - 제품·자재를 먼저 승인해야 BOM·재고·월별 수요를 올릴 수 있습니다.
 - 배치 상태(`MAPPING_HOLD`, `HAS_ERRORS`, `READY_FOR_APPROVAL`, `APPROVED`, `REJECTED`)별로 열 지정·재검증, 오류 확인, 승인·반려를 처리합니다.
@@ -30,13 +30,13 @@
 
 ### 4. 실행 가능성 진단
 
-![실행 가능성 진단 화면](docs/screenshots/04-execution-diagnosis.png)
+![실행 가능성 진단 화면](docs/screenshots/04-feasibility-diagnosis.png)
 
 - 선택한 계획의 위반·미확인 제약과 원인, 제품별 생산계획, 자재 소요·부족량, 계산 가정을 보여줍니다.
 
 ### 5. 승인 및 Excel 출력
 
-![승인 및 Excel 출력 화면](docs/screenshots/05-final-approval.png)
+![승인 및 Excel 출력 화면](docs/screenshots/05-approval-export.png)
 
 - 실행 불가 계획은 승인할 수 없고, 미확인 계획은 확인 체크 후 승인합니다.
 - Excel은 실제 `POST /exports/plans/xlsx`를 호출하며 DEMO/UNVERIFIED 출력입니다.
