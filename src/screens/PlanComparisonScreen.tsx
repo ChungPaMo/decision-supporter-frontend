@@ -1,179 +1,128 @@
-import React, { useState } from 'react';
+import { planResponses, ScenarioId } from '../services/fixtures';
 import { useProductionStore } from '../store/productionStore';
-import '../styles/screens.css';
+import { FeasibilityBadge, Notice, PLAN_BASIS, PLAN_LABEL, qty, ScreenHeader } from '../components/ui';
 
-interface Props {
-  onNext: () => void;
-  onAnalyze: (planType: string) => void;
-}
+const KPI_GROUPS: Array<{ title: string; codes: string[] }> = [
+  { title: '생산·수요', codes: ['TOTAL_PRODUCTION', 'PLANNED_DEMAND', 'END_INVENTORY_AT_P50', 'OVERTIME_HOURS'] },
+  { title: '위험', codes: ['DEMAND_COVERAGE_P80', 'STOCKOUT_QTY', 'SAFETY_STOCK_SHORTFALL', 'MATERIAL_SHORTAGE_ITEMS'] },
+  { title: '비용', codes: ['TOTAL_COST', 'MATERIAL_COST', 'REGULAR_LABOR_COST', 'OVERTIME_COST', 'HOLDING_COST'] },
+];
 
-export default function PlanComparisonScreen({ onNext, onAnalyze }: Props) {
-  const { planCondition, plans, selectedPlanType, setSelectedPlan, setPlanCondition } = useProductionStore();
-  const [showConditionModal, setShowConditionModal] = useState(false);
-  const [tempCondition, setTempCondition] = useState(planCondition);
+const SCENARIOS: Array<{ id: ScenarioId; label: string }> = [
+  { id: 'BASE', label: '기본 조건' },
+  { id: 'DEMAND_120', label: '수요 +20%' },
+];
 
-  const handleConditionChange = () => {
-    setPlanCondition(tempCondition);
-    setShowConditionModal(false);
-  };
+export default function PlanComparisonScreen() {
+  const { scenario, setScenario, selectedPlanId, selectPlan, setStep } = useProductionStore();
+  const response = planResponses[scenario];
+  const { plans, horizon } = response.export;
+  const kpiOf = (planIndex: number, code: string) => plans[planIndex].kpis.find((kpi) => kpi.code === code);
+  const causes = (planId: string) =>
+    response.comparison.infeasibility_reasons.find((reason) => reason.plan_id === planId)?.causes ?? [];
 
   return (
-    <div className="screen screen-comparison">
-      <div className="screen-title">
-        <h2>생산계획 비교 및 승인</h2>
-        <p className="screen-description">AI가 생성한 세 가지 생산계획을 비교하여 최적의 계획을 선택합니다.</p>
-      </div>
+    <div className="screen">
+      <ScreenHeader
+        title="생산계획 비교"
+        description={`${horizon.period_from} ~ ${horizon.period_to} 계획안 3개입니다. 시스템은 순위를 매기지 않으며 선택은 담당자가 합니다.`}
+      />
 
-      {/* 생산 조건 */}
-      <div className="condition-card">
-        <div className="condition-header">
-          <h3>생산 조건</h3>
-          <button className="btn-small" onClick={() => setShowConditionModal(true)}>
-            조건 변경
-          </button>
-        </div>
-        <div className="condition-grid">
-          <div className="condition-item">
-            <div className="label">예상 수요</div>
-            <div className="value">{planCondition.expectedDemand.toLocaleString()}개</div>
-          </div>
-          <div className="condition-item">
-            <div className="label">현재고</div>
-            <div className="value">{planCondition.currentStock.toLocaleString()}개</div>
-          </div>
-          <div className="condition-item">
-            <div className="label">안전재고</div>
-            <div className="value">{planCondition.safetyStock.toLocaleString()}개</div>
-          </div>
-          <div className="condition-item">
-            <div className="label">정규 CAPA</div>
-            <div className="value">{planCondition.regularCapacity.toLocaleString()}개/월</div>
-          </div>
-        </div>
-      </div>
-
-      {/* 계획안 카드들 */}
-      <div className="plans-container">
-        {plans.map((plan) => (
-          <div
-            key={plan.planType}
-            className={`plan-card ${selectedPlanType === plan.planType ? 'selected' : ''}`}
-            onClick={() => setSelectedPlan(plan.planType)}
+      <div className="segmented" role="group" aria-label="계산 조건">
+        {SCENARIOS.map((item) => (
+          <button
+            key={item.id}
+            type="button"
+            aria-pressed={scenario === item.id}
+            onClick={() => setScenario(item.id)}
           >
-            <div className="plan-header">
-              <h3>{plan.title}</h3>
-              <p className="plan-subtitle">{plan.description}</p>
-            </div>
-
-            <div className="plan-metrics">
-              <div className="metric">
-                <span className="metric-label">생산량</span>
-                <span className="metric-value">{plan.productionQty.toLocaleString()}개</span>
-              </div>
-              <div className="metric">
-                <span className="metric-label">정규 생산</span>
-                <span className="metric-value">{plan.regularProduction.toLocaleString()}개</span>
-              </div>
-              <div className="metric">
-                <span className="metric-label">특근</span>
-                <span className="metric-value">{plan.overtimeProduction.toLocaleString()}개</span>
-              </div>
-              <div className="metric">
-                <span className="metric-label">외주</span>
-                <span className="metric-value">{plan.outsourcing.toLocaleString()}개</span>
-              </div>
-              <div className="metric">
-                <span className="metric-label">추가 자재</span>
-                <span className="metric-value">{plan.additionalMaterials.toLocaleString()}kg</span>
-              </div>
-              <div className="metric">
-                <span className="metric-label">운영비</span>
-                <span className="metric-value metric-cost">
-                  ₩{(plan.expectedCost / 1000000).toFixed(1)}M
-                </span>
-              </div>
-              <div className="metric">
-                <span className="metric-label">기말재고</span>
-                <span className="metric-value">{plan.endingStock.toLocaleString()}개</span>
-              </div>
-              <div className="metric">
-                <span className="metric-label">제약 위반</span>
-                <span className="metric-value metric-violation">{plan.constraintViolations}건</span>
-              </div>
-            </div>
-
-            <button
-              className="btn-analyze"
-              onClick={(e) => {
-                e.stopPropagation();
-                setSelectedPlan(plan.planType);
-                onAnalyze(plan.planType);
-              }}
-            >
-              상세 분석 →
-            </button>
-          </div>
+            {item.label}
+          </button>
         ))}
       </div>
 
-      {/* 액션 버튼 */}
-      <div className="button-group">
-        <button className="btn btn-secondary">📥 Excel 미리보기</button>
-        <button className="btn btn-primary" onClick={onNext} disabled={!selectedPlanType}>
-          선택 완료 →
+      <section className="panel">
+        <div className="table-scroll">
+          <table className="compare">
+            <caption className="visually-hidden">계획안별 지표 비교</caption>
+            <thead>
+              <tr>
+                <th scope="col">지표</th>
+                {plans.map((plan) => (
+                  <th key={plan.plan_id} scope="col" className={plan.plan_id === selectedPlanId ? 'selected' : ''}>
+                    <label className="plan-choice">
+                      <input
+                        type="radio"
+                        name="plan"
+                        checked={plan.plan_id === selectedPlanId}
+                        onChange={() => selectPlan(plan.plan_id)}
+                      />
+                      <span>
+                        <strong>{PLAN_LABEL[plan.plan_type]}</strong>
+                        <small>{PLAN_BASIS[plan.plan_type]}</small>
+                      </span>
+                    </label>
+                    <FeasibilityBadge value={plan.feasibility} />
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            {KPI_GROUPS.map((group) => (
+              <tbody key={group.title}>
+                <tr className="group-row">
+                  <th colSpan={plans.length + 1} scope="colgroup">
+                    {group.title}
+                  </th>
+                </tr>
+                {group.codes.map((code) => (
+                  <tr key={code}>
+                    <th scope="row">
+                      {kpiOf(0, code)?.label} <small>{kpiOf(0, code)?.unit}</small>
+                    </th>
+                    {plans.map((plan, index) => (
+                      <td key={plan.plan_id} className={`num ${plan.plan_id === selectedPlanId ? 'selected' : ''}`}>
+                        {qty(kpiOf(index, code)?.value)}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            ))}
+            <tbody>
+              <tr className="group-row">
+                <th colSpan={plans.length + 1} scope="colgroup">
+                  판정 사유
+                </th>
+              </tr>
+              <tr>
+                <th scope="row">불가·미확인 원인</th>
+                {plans.map((plan) => (
+                  <td key={plan.plan_id} className={plan.plan_id === selectedPlanId ? 'selected' : ''}>
+                    {causes(plan.plan_id).length === 0
+                      ? '없음'
+                      : `${causes(plan.plan_id)[0].note}${
+                          causes(plan.plan_id).length > 1 ? ` 외 ${causes(plan.plan_id).length - 1}건` : ''
+                        }`}
+                  </td>
+                ))}
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      {response.warnings.map((warning) => (
+        <Notice key={warning.code}>{warning.detail}</Notice>
+      ))}
+
+      <div className="actions">
+        <button type="button" className="button" onClick={() => setStep('forecast')}>
+          이전
+        </button>
+        <button type="button" className="button primary" disabled={!selectedPlanId} onClick={() => setStep('diagnosis')}>
+          {selectedPlanId ? '선택한 계획 진단' : '계획안을 선택하세요'}
         </button>
       </div>
-
-      {/* 조건 변경 모달 */}
-      {showConditionModal && (
-        <div className="modal-overlay" onClick={() => setShowConditionModal(false)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <h3>생산 조건 변경</h3>
-            <div className="modal-form">
-              <div className="form-group">
-                <label>예상 수요 (개)</label>
-                <input
-                  type="number"
-                  value={tempCondition.expectedDemand}
-                  onChange={(e) => setTempCondition({ ...tempCondition, expectedDemand: parseInt(e.target.value) })}
-                />
-              </div>
-              <div className="form-group">
-                <label>현재고 (개)</label>
-                <input
-                  type="number"
-                  value={tempCondition.currentStock}
-                  onChange={(e) => setTempCondition({ ...tempCondition, currentStock: parseInt(e.target.value) })}
-                />
-              </div>
-              <div className="form-group">
-                <label>안전재고 (개)</label>
-                <input
-                  type="number"
-                  value={tempCondition.safetyStock}
-                  onChange={(e) => setTempCondition({ ...tempCondition, safetyStock: parseInt(e.target.value) })}
-                />
-              </div>
-              <div className="form-group">
-                <label>정규 CAPA (개/월)</label>
-                <input
-                  type="number"
-                  value={tempCondition.regularCapacity}
-                  onChange={(e) => setTempCondition({ ...tempCondition, regularCapacity: parseInt(e.target.value) })}
-                />
-              </div>
-            </div>
-            <div className="modal-buttons">
-              <button className="btn btn-secondary" onClick={() => setShowConditionModal(false)}>
-                취소
-              </button>
-              <button className="btn btn-primary" onClick={handleConditionChange}>
-                적용
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

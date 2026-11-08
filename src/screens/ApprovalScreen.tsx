@@ -1,169 +1,146 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
+import { apiClient } from '../services/api';
+import { planResponses } from '../services/fixtures';
 import { useProductionStore } from '../store/productionStore';
-import '../styles/screens.css';
+import { errorMessage, FeasibilityBadge, Notice, PLAN_LABEL, qty, ROLE_CODE, ScreenHeader } from '../components/ui';
 
-interface Props {
-  onComplete: () => void;
-}
+const SUMMARY_KPIS = ['TOTAL_PRODUCTION', 'TOTAL_COST', 'END_INVENTORY_AT_P50', 'DEMAND_COVERAGE_P80'];
 
-export default function ApprovalScreen({ onComplete }: Props) {
-  const { selectedPlanType, plans, approvalRecords, addApprovalRecord } = useProductionStore();
-  const [approverName, setApproverName] = useState('');
-  const [approvalNote, setApprovalNote] = useState('');
-  const [isApproved, setIsApproved] = useState(false);
+export default function ApprovalScreen() {
+  const { scenario, selectedPlanId, approvals, addApproval, setStep } = useProductionStore();
+  const [actor, setActor] = useState('REVIEWER-01');
+  const [acknowledged, setAcknowledged] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [exportResult, setExportResult] = useState<{ tone: 'ok' | 'bad'; text: string } | null>(null);
+  const [approvedNow, setApprovedNow] = useState(false);
 
-  const selectedPlan = plans.find((p) => p.planType === selectedPlanType);
+  const response = planResponses[scenario];
+  const plan = response.export.plans.find((item) => item.plan_id === selectedPlanId);
+  if (!plan) return null;
 
-  const handleApproval = () => {
-    if (!approverName) {
-      alert('승인자를 입력해주세요.');
-      return;
-    }
+  const planLabel = PLAN_LABEL[plan.plan_type];
+  const actorValid = ROLE_CODE.test(actor);
+  const blocked = plan.feasibility === 'INFEASIBLE';
+  const needsAck = plan.feasibility === 'UNVERIFIED';
+  const canApprove = actorValid && !blocked && (!needsAck || acknowledged) && !approvedNow;
 
-    addApprovalRecord({
-      date: new Date().toLocaleString('ko-KR'),
-      planType: selectedPlan?.title || '',
-      approver: approverName,
-      fileName: `Plan_${selectedPlanType}_${new Date().getTime()}.xlsx`,
+  const approve = () => {
+    addApproval({
+      at: new Date().toLocaleString('ko-KR'),
+      planLabel,
+      scenarioLabel: response.scenario.label,
+      actor,
+      inputDigest: response.input_digest,
     });
-
-    setIsApproved(true);
-    setTimeout(onComplete, 2000);
+    setApprovedNow(true);
   };
 
-  const handleExcelDownload = () => {
-    alert('Excel 파일 다운로드: Plan_' + selectedPlanType + '.xlsx');
+  const download = async () => {
+    setExporting(true);
+    setExportResult(null);
+    try {
+      const filename = await apiClient.downloadPlanXlsx(response.export);
+      setExportResult({ tone: 'ok', text: `${filename} 파일을 내려받았습니다.` });
+    } catch (error) {
+      setExportResult({ tone: 'bad', text: errorMessage(error) });
+    } finally {
+      setExporting(false);
+    }
   };
-
-  if (isApproved) {
-    return (
-      <div className="screen screen-approval">
-        <div className="approval-success">
-          <div className="success-icon">✓</div>
-          <h2>승인이 완료되었습니다</h2>
-          <p>생산계획이 최종 승인되고 저장되었습니다.</p>
-          <div className="approval-details">
-            <div className="detail-item">
-              <span className="label">승인자:</span>
-              <span className="value">{approverName}</span>
-            </div>
-            <div className="detail-item">
-              <span className="label">승인 시간:</span>
-              <span className="value">{new Date().toLocaleString('ko-KR')}</span>
-            </div>
-            <div className="detail-item">
-              <span className="label">계획안:</span>
-              <span className="value">{selectedPlan?.title}</span>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   return (
-    <div className="screen screen-approval">
-      <div className="screen-title">
-        <h2>최종 승인 및 Excel 출력</h2>
-        <p className="screen-description">선택된 생산계획을 최종 승인하고 이력을 관리합니다.</p>
-      </div>
+    <div className="screen">
+      <ScreenHeader
+        title="승인 및 Excel 출력"
+        description="선택한 계획을 확인하고 승인 기록을 남긴 뒤 비교 결과를 Excel 로 내려받습니다."
+      />
 
-      {/* 계획안 요약 */}
-      <div className="card">
-        <h3 className="card-title">생산계획 요약</h3>
-        <div className="summary-grid">
-          <div className="summary-item">
-            <span className="label">선택한 계획안</span>
-            <span className="value large">{selectedPlan?.title}</span>
+      <section className="panel stack">
+        <div className="panel-heading">
+          <div>
+            <h3>{planLabel}</h3>
+            <p className="muted">{response.scenario.label} 조건</p>
           </div>
-          <div className="summary-item">
-            <span className="label">생산량</span>
-            <span className="value">{selectedPlan?.productionQty.toLocaleString()}개</span>
-          </div>
-          <div className="summary-item">
-            <span className="label">예상 운영비</span>
-            <span className="value">₩{((selectedPlan?.expectedCost || 0) / 1000000).toFixed(1)}M</span>
-          </div>
-          <div className="summary-item">
-            <span className="label">기말재고</span>
-            <span className="value">{selectedPlan?.endingStock.toLocaleString()}개</span>
-          </div>
-          <div className="summary-item">
-            <span className="label">제약조건 위반</span>
-            <span className={`value ${selectedPlan?.constraintViolations === 0 ? 'status-ok' : 'status-error'}`}>
-              {selectedPlan?.constraintViolations}건
-            </span>
-          </div>
+          <FeasibilityBadge value={plan.feasibility} />
         </div>
-      </div>
+        <dl className="meta-grid">
+          {SUMMARY_KPIS.map((code) => {
+            const kpi = plan.kpis.find((item) => item.code === code);
+            return (
+              <div key={code}>
+                <dt>{kpi?.label}</dt>
+                <dd>
+                  {qty(kpi?.value)} {kpi?.value !== null ? kpi?.unit : ''}
+                </dd>
+              </div>
+            );
+          })}
+        </dl>
+      </section>
 
-      {/* 승인 정보 입력 */}
-      <div className="card">
-        <h3 className="card-title">승인 정보</h3>
-        <div className="form-group">
-          <label>승인자 이름</label>
-          <input
-            type="text"
-            value={approverName}
-            onChange={(e) => setApproverName(e.target.value)}
-            placeholder="예: 관리자, 부장"
-            className="input"
-          />
+      <section className="panel stack">
+        <h3>계획 승인</h3>
+        {blocked && <Notice tone="bad">실행 불가 계획은 승인할 수 없습니다. 다른 안이나 조건을 선택하세요.</Notice>}
+        {needsAck && (
+          <label className="check">
+            <input type="checkbox" checked={acknowledged} onChange={(event) => setAcknowledged(event.target.checked)} />
+            <span>미확인 제약을 진단 화면에서 확인했고, 이를 감수하고 승인합니다.</span>
+          </label>
+        )}
+        <label className="field narrow">
+          <span>승인자 역할 코드</span>
+          <input value={actor} aria-invalid={!actorValid} onChange={(event) => setActor(event.target.value)} />
+          {!actorValid && <small className="field-error">영문·숫자로 된 역할 코드만 입력할 수 있습니다.</small>}
+        </label>
+        {approvedNow && <Notice tone="ok">{planLabel} 승인이 기록되었습니다.</Notice>}
+        <div className="actions">
+          <button type="button" className="button primary" disabled={!canApprove} onClick={approve}>
+            이 계획 승인
+          </button>
         </div>
-        <div className="form-group">
-          <label>승인 메모 (선택)</label>
-          <textarea
-            value={approvalNote}
-            onChange={(e) => setApprovalNote(e.target.value)}
-            placeholder="승인 시 특이사항이나 메모를 입력해주세요."
-            className="input"
-            rows={3}
-          />
-        </div>
-      </div>
-
-      {/* 액션 버튼 */}
-      <div className="button-group">
-        <button className="btn btn-secondary" onClick={handleExcelDownload}>
-          📥 Excel 다운로드
-        </button>
-        <button className="btn btn-primary" onClick={handleApproval} disabled={!approverName}>
-          ✓ 최종 승인
-        </button>
-      </div>
-
-      {/* 승인 이력 */}
-      <div className="card">
-        <h3 className="card-title">승인 이력</h3>
-        {approvalRecords.length === 0 ? (
-          <p className="empty-message">아직 승인 기록이 없습니다.</p>
-        ) : (
-          <div className="table-wrapper">
-            <table className="history-table">
+        {approvals.length > 0 && (
+          <div className="table-scroll">
+            <table>
+              <caption>승인 기록</caption>
               <thead>
                 <tr>
-                  <th>날짜</th>
-                  <th>계획안</th>
-                  <th>승인자</th>
-                  <th>파일</th>
+                  <th scope="col">일시</th>
+                  <th scope="col">계획안</th>
+                  <th scope="col">조건</th>
+                  <th scope="col">승인자</th>
                 </tr>
               </thead>
               <tbody>
-                {approvalRecords.map((record, idx) => (
-                  <tr key={idx}>
-                    <td>{record.date}</td>
-                    <td>{record.planType}</td>
-                    <td>{record.approver}</td>
-                    <td>
-                      <button className="link-btn">📥 {record.fileName}</button>
-                    </td>
+                {approvals.map((record, index) => (
+                  <tr key={index}>
+                    <td>{record.at}</td>
+                    <td>{record.planLabel}</td>
+                    <td>{record.scenarioLabel}</td>
+                    <td>{record.actor}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
         )}
-      </div>
+        <p className="muted">계획 승인 저장 API 가 아직 없어 이 기록은 현재 브라우저 세션에만 남습니다.</p>
+      </section>
+
+      <section className="panel stack">
+        <h3>Excel 출력</h3>
+        <Notice tone="warn">
+          이 파일은 DEMO/UNVERIFIED 이며 공식 문서가 아닙니다. 승인 여부와 관계없이 계획안 전체의 비교 결과가 담깁니다.
+        </Notice>
+        {exportResult && <Notice tone={exportResult.tone}>{exportResult.text}</Notice>}
+        <div className="actions">
+          <button type="button" className="button" onClick={() => setStep('diagnosis')}>
+            이전
+          </button>
+          <button type="button" className="button primary" disabled={exporting} onClick={download}>
+            {exporting ? '생성 중…' : 'Excel 다운로드'}
+          </button>
+        </div>
+      </section>
     </div>
   );
 }

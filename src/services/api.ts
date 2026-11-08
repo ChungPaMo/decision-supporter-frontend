@@ -1,4 +1,4 @@
-import { BatchDetail, Entity, ValidationIssue } from '../types/api';
+import { BatchDetail, Entity, ValidationResult } from '../types/api';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
 
@@ -35,6 +35,14 @@ class ApiClient {
   // 건강 체크
   async health() {
     return this.request('GET', '/health');
+  }
+
+  // 저장 없는 검증. /batches 가 501 인 동안 실제 서버에 붙는 유일한 업로드 경로
+  async previewBatch(file: File, entity: Entity): Promise<ValidationResult> {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('entity', entity);
+    return this.request('POST', '/ingest/preview', { formData });
   }
 
   // 파일 업로드 (검증)
@@ -152,7 +160,7 @@ class ApiClient {
   }
 
   // Excel 다운로드
-  async downloadPlanXlsx(planJson: any) {
+  async downloadPlanXlsx(planJson: unknown): Promise<string> {
     const res = await fetch(`${API_BASE}/exports/plans/xlsx`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -167,7 +175,7 @@ class ApiClient {
     const header = res.headers.get('Content-Disposition') ?? '';
     const utf8Match = header.match(/filename\*=UTF-8''([^;]+)/);
     const asciiMatch = header.match(/filename="([^"]+)"/);
-    const filename = utf8Match ? decodeURIComponent(utf8Match[1]) : asciiMatch?.[1] ?? 'plan.xlsx';
+    const filename = utf8Match ? decodeURIComponent(utf8Match[1]) : asciiMatch?.[1] ?? 'DEMO_UNVERIFIED_plan_export.xlsx';
 
     const blob = await res.blob();
     const url = URL.createObjectURL(blob);
@@ -176,6 +184,7 @@ class ApiClient {
     a.download = filename;
     a.click();
     URL.revokeObjectURL(url);
+    return filename;
   }
 }
 
