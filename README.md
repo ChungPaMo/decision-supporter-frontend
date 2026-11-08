@@ -6,7 +6,8 @@
 
 ### 1️⃣ **Screen 1: 데이터 업로드 및 검토**
 데이터 소스를 입력하고 자동으로 필드를 분류하는 단계입니다.
-n![데이터 업로드 및 검토 화면](docs/screenshots/01-data-upload.png)
+
+![데이터 업로드 및 검토 화면](docs/screenshots/01-data-upload.png)
 
 **주요 기능:**
 - **엑셀 파일 업로드**: CSV 또는 XLSX 형식의 수요 데이터, 제품 마스터, BOM, 재고 정보 입력
@@ -23,7 +24,8 @@ n![데이터 업로드 및 검토 화면](docs/screenshots/01-data-upload.png)
 
 ### 2️⃣ **Screen 2: 생산계획 비교 및 승인**
 AI가 생성한 3가지 생산계획을 비교하고 최적의 계획을 선택합니다.
-n![생산계획 비교 화면](docs/screenshots/02-plan-comparison.png)
+
+![생산계획 비교 화면](docs/screenshots/02-plan-comparison.png)
 
 **주요 기능:**
 - **생산 조건 카드**: 예상 수요, 현재고, 안전재고, 정규 CAPA 표시
@@ -46,7 +48,8 @@ n![생산계획 비교 화면](docs/screenshots/02-plan-comparison.png)
 
 ### 3️⃣ **Screen 3: 예측 근거 및 불확실성 분석**
 AI 수요 예측의 신뢰도와 근거를 확인합니다.
-n![예측 근거 및 불확실성 분석 화면](docs/screenshots/03-prediction-analysis.png)
+
+![예측 근거 및 불확실성 분석 화면](docs/screenshots/03-prediction-analysis.png)
 
 **주요 기능:**
 - **수요 예측 범위**: 최소/최대 예측값과 신뢰 구간 시각화
@@ -70,7 +73,8 @@ n![예측 근거 및 불확실성 분석 화면](docs/screenshots/03-prediction-
 
 ### 4️⃣ **Screen 4: 실행 불가 원인 진단**
 생산계획의 제약조건 위반을 파악하고 해결책을 제시합니다.
-n![실행 불가 원인 진단 화면](docs/screenshots/04-execution-diagnosis.png)
+
+![실행 불가 원인 진단 화면](docs/screenshots/04-execution-diagnosis.png)
 
 **주요 기능:**
 - **선택 계획 상태**: 현재 선택된 계획과 실행 가능 여부 표시
@@ -95,7 +99,8 @@ n![실행 불가 원인 진단 화면](docs/screenshots/04-execution-diagnosis.p
 
 ### 5️⃣ **Screen 5: 최종 승인 및 Excel 출력**
 검토된 생산계획을 최종 승인하고 Excel로 출력합니다.
-n![최종 승인 및 Excel 출력 화면](docs/screenshots/05-final-approval.png)
+
+![최종 승인 및 Excel 출력 화면](docs/screenshots/05-final-approval.png)
 
 **주요 기능:**
 - **생산계획 요약** (5가지 지표):
