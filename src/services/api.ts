@@ -1,4 +1,5 @@
-import { BatchDetail, Entity, ValidationResult } from '../types/api';
+import { BatchDetail, BatchSummary, Entity, Page, ValidationResult } from '../types/api';
+import { ForecastExecution, ForecastExecutionSummary, ForecastRunParameters, ForecastRunReply } from '../types/engine';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
 
@@ -24,7 +25,12 @@ class ApiClient {
       config.headers = options?.headers;
     }
 
-    const res = await fetch(url, config);
+    let res: Response;
+    try {
+      res = await fetch(url, config);
+    } catch {
+      throw { detail: { code: 'NETWORK_ERROR', message: '서버에 연결할 수 없습니다. 연결과 CORS 설정을 확인한 뒤 다시 조회하세요.' } };
+    }
     if (!res.ok) {
       const error = await res.json().catch(() => ({ detail: { code: 'NETWORK_ERROR', message: res.statusText } }));
       throw error;
@@ -33,6 +39,18 @@ class ApiClient {
   }
 
   // 건강 체크
+  async runForecast(parameters: ForecastRunParameters): Promise<ForecastRunReply> {
+    return this.request('POST', '/forecasts', { body: parameters });
+  }
+
+  async forecastHistory(limit = 20, offset = 0): Promise<Page<ForecastExecutionSummary>> {
+    return this.request('GET', `/forecasts?limit=${limit}&offset=${offset}`);
+  }
+
+  async getForecast(executionId: string): Promise<ForecastExecution> {
+    return this.request('GET', `/forecasts/${encodeURIComponent(executionId)}`);
+  }
+
   async health() {
     return this.request('GET', '/health');
   }
@@ -77,7 +95,27 @@ class ApiClient {
     if (status) params.append('status', status);
     params.append('limit', String(limit));
     params.append('offset', String(offset));
-    return this.request('GET', `/batches?${params}`);
+    return this.request<Page<BatchSummary>>('GET', `/batches?${params}`);
+  }
+
+  async allBatches(): Promise<BatchSummary[]> {
+    const rows: BatchSummary[] = [];
+    let offset = 0;
+    while (true) {
+      const page = await this.listBatches(undefined, 100, offset);
+      rows.push(...page.items);
+      offset += page.items.length;
+      if (offset >= page.total) return rows;
+      if (page.items.length === 0) throw new Error('배치 목록을 끝까지 읽지 못했습니다. 다시 조회하세요.');
+    }
+  }
+
+  async approvedData(entity: Entity): Promise<Array<Record<string, unknown>>> {
+    const paths: Record<Entity, string> = { product: '/products', material: '/materials', bom: '/boms', inventory: '/inventory', monthly_demand: '/demand/monthly' };
+    const page = await this.request<Page<Record<string, unknown>>>('GET', `${paths[entity]}?limit=100&offset=0`);
+    return entity === 'bom'
+      ? page.items.flatMap((row) => (row.lines as Array<Record<string, unknown>>).map((line) => ({ ...row, lines: undefined, ...line })))
+      : page.items;
   }
 
   // 배치 상세
@@ -91,8 +129,8 @@ class ApiClient {
     data: {
       expected_version: number;
       column_overrides?: Record<string, string>;
-      default_unit?: string;
-      sheet?: string;
+      default_unit?: string | null;
+      sheet?: string | null;
     }
   ): Promise<BatchDetail> {
     return this.request('POST', `/batches/${batchId}/revalidate`, { body: data });

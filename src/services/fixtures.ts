@@ -17,11 +17,10 @@ import materials22 from '../mocks/22_list_materials.json';
 import boms23 from '../mocks/23_list_boms.json';
 import inventory24 from '../mocks/24_list_inventory.json';
 import demand25 from '../mocks/25_list_demand.json';
-import forecast from '../mocks/forecast_response.json';
 import planBase from '../mocks/plan_response.json';
 import planWhatIf from '../mocks/plan_response_whatif_demand120.json';
 import { BatchDetail, Entity } from '../types/api';
-import { ForecastResponse, PlanResponse } from '../types/engine';
+import { PlanResponse } from '../types/engine';
 
 const batch = (fixture: unknown) => (fixture as { response: unknown }).response as BatchDetail;
 
@@ -65,7 +64,6 @@ export const approvedRows: Record<Entity, Array<Record<string, unknown>>> = {
   monthly_demand: items(demand25),
 };
 
-export const forecastResponse = forecast as unknown as ForecastResponse;
 
 export type ScenarioId = 'BASE' | 'DEMAND_120';
 

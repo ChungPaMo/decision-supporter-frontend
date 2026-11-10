@@ -19,12 +19,49 @@ export interface ForecastResponse {
     quantile_model_version: string;
     trained_until: string;
     horizon_months: number;
-    data_classification: string;
-  };
+    data_classification: string | null;
+    input_digest: string;
+    random_seed: number;
+    generated_at: string;
+  } | null;
   forecasts: ForecastRow[];
-  skipped: Array<{ product_id: string; reason_code: string; detail: string; observed_months: number }>;
+  skipped: Array<{ product_id: string; reason_code: string; detail: string; observed_months: number | null }>;
   adjustments: Array<{ product_id: string; target_month: string; code: string }>;
   warnings: Array<{ code: string; detail: string }>;
+  errors: Array<{ code: string; detail: string; loc?: string | null }>;
+}
+
+export interface ForecastRunParameters {
+  trained_until: string;
+  horizon_months: number;
+  p50_method: 'MA12' | 'LGBM_L1';
+  min_history_months?: number;
+  random_seed?: number;
+}
+
+export interface ForecastExecutionSummary {
+  execution_id: string;
+  status: ForecastResponse['status'] | 'FAILED';
+  input_digest: string;
+  dedup_key: string;
+  parameters: ForecastRunParameters;
+  runtime_identity: Record<string, unknown>;
+  quantile_model_version: string | null;
+  input_row_count: number;
+  forecast_count: number;
+  created_at: string;
+  finished_at: string;
+}
+
+export interface ForecastExecution extends ForecastExecutionSummary {
+  result: ForecastResponse | null;
+  failure: { code: string; message: string } | null;
+  input_batches: Array<{ batch_id: string; batch_version: number; source_sha256: string; result_digest: string | null; approved_at: string }>;
+}
+
+export interface ForecastRunReply {
+  execution: ForecastExecution;
+  reused: boolean;
 }
 
 export type Feasibility = 'FEASIBLE' | 'INFEASIBLE' | 'UNVERIFIED';

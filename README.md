@@ -32,7 +32,7 @@ flowchart LR
 
 ## 핵심 흐름
 
-`decision-supporter/docs`의 API·엔진 계약 순서를 따릅니다: 데이터 승인 → 수요 예측 → 계획 3안 비교 → 제약 진단 → 승인·Excel 출력.
+데이터 등록·승인 → 수요 예측 실행·저장·이력 조회는 실제 API입니다. 이후 계획 비교·진단·계획 승인은 독립 예시이며 실제 예측과 연결되지 않았습니다.
 
 ### 1. 데이터 등록·승인
 
@@ -41,13 +41,17 @@ flowchart LR
 - 제품·자재를 먼저 승인해야 BOM·재고·월별 수요를 올릴 수 있습니다.
 - 배치 상태(`MAPPING_HOLD`, `HAS_ERRORS`, `READY_FOR_APPROVAL`, `APPROVED`, `REJECTED`)별로 열 지정·재검증, 오류 확인, 승인·반려를 처리합니다.
 - 승인자는 실명이 아닌 역할 코드(`REVIEWER-01`)로 입력합니다.
-- 내 파일 검증은 실제 `POST /ingest/preview`를 호출합니다.
+- CSV/XLSX 등록은 실제 `POST /batches`를 호출합니다. 열 지정·재검증·승인·반려는 서버 응답으로만 상태를 갱신합니다.
+- 새로고침 시 배치 목록·상세를 DB에서 다시 조회합니다. 브라우저에는 선택한 배치 ID만 저장합니다.
+- 409 충돌은 최신 결과를 다시 검토하고 재요청합니다. 연결 실패 시 예시 승인으로 전환하지 않습니다.
 
 ### 2. 수요 예측 확인
 
 ![수요 예측 확인 화면](docs/screenshots/02-forecast.png)
 
 - 제품·월별 P50·P80·P90, 실행 정보, 제외 제품, 분위수 보정, 경고를 표시합니다.
+- 기준일·예측 기간·P50 방식·최소 이력·시드를 입력해 승인 수요로 실제 실행합니다. 이력·상세와 입력 지문·출처 버전을 조회하고 새로고침 후 서버 결과를 복원합니다.
+- 부분 성공·데이터 부족·입력 오류/run=null·모델 실패를 구분합니다. 서버 오류 시 예시 결과로 전환하지 않습니다.
 
 ### 3. 생산계획 비교
 
@@ -73,9 +77,11 @@ flowchart LR
 
 | 영역 | 현재 동작 |
 |---|---|
-| `POST /ingest/preview`, `POST /exports/plans/xlsx` | 실제 서버 호출 (서버 `.env`에 `CORS_ALLOW_ORIGINS=http://localhost:5173` 필요) |
-| `/batches*`, 마스터 조회 | 서버 기본 설정이 501이라 `src/mocks`의 계약 예시 응답으로 동작 |
-| 예측·계획 생성, 계획 승인 저장 | API 미구현. 예시 응답과 브라우저 세션 기록으로 동작 |
+| `/batches*`, 마스터·수요 조회 | 실제 PostgreSQL 저장·재검증·승인·반려·조회. `PERSISTENCE=postgres` 필요 |
+| `POST /exports/plans/xlsx` | 예시 계획 JSON으로 실제 서버 호출. 공식 승인 문서 아님 |
+| `/dev/forecasts` | 백엔드의 합성 JSON 전용 예측 API. 현재 예측 화면은 아직 이 API를 호출하지 않음 |
+| `POST/GET /forecasts`, `GET /forecasts/{execution_id}` | 승인 월별 수요로 실제 예측·저장·이력·상세 조회. Alembic 0005 필요 |
+| 계획 비교·진단 화면, 계획 승인 저장 | 예시 응답과 메모리 기록. 실제 예측 결과와 미연결 |
 
 ---
 
@@ -113,9 +119,9 @@ flowchart LR
   Client -->|"CSV·XLSX 검증"| Preview
   Client -->|"계획 JSON"| Export
   Export -->|"DEMO Excel"| Client
-  Client -.->|"기본 설정 501"| Batches
-  Batches -.-> DB
-  DB -.->|"승인 데이터"| Forecast
+  Client -->|"등록·재검증·승인·반려·조회"| Batches
+  Batches --> DB
+  DB -->|"승인 데이터"| Forecast
   Forecast -.-> Planner
   Planner -.->|"plan-export JSON"| Export
 ```
@@ -125,8 +131,8 @@ flowchart LR
 | 프론트엔드 | 업로드 검토, 예측 확인, 계획 비교, 진단, 승인·출력 | 구현 |
 | `POST /ingest/preview` | 저장 없는 파일 파싱·매핑·검증 | 서버 동작 |
 | `POST /exports/plans/xlsx` | 계획 JSON을 DEMO/UNVERIFIED Excel로 출력 | 서버 동작 |
-| `/batches*`, 마스터 조회 | 배치 저장·승인, 승인 데이터 조회 | 기본 설정에서 501, 예시 응답 사용 |
-| 예측 모듈 | P50·P80·P90 수요 예측 | 모듈 구현, API 미연결 |
+| `/batches*`, 마스터 조회 | 배치 저장·승인, 승인 데이터 조회 | 실제 PostgreSQL API 연결 |
+| 예측 모듈 | P50·P80·P90 수요 예측 | 승인 수요 실행·저장·이력 API 및 실제 화면 연결 |
 | 계획 모듈 | 기준형·안정형·비용절감형 계산 | 구현 전, 예시 응답 사용 |
 | 로그인·권한, 계획 승인 저장 | 사용자 인증, 승인 이력 영구 저장 | 없음 |
 
@@ -143,7 +149,7 @@ flowchart TD
   C --> D{"5종 모두 승인?"}
   D -->|"아니오"| C
   D -->|"예"| E["수요 예측 확인 P50·P80·P90"]
-  E --> F["계획 3안 비교"]
+  E -.->|"실제 예측과 미연결"| F["계획 3안 비교 (별도 예시)"]
   F --> G["계획안 선택"]
   G --> H{"실행 가능성"}
   H -->|"FEASIBLE"| J["역할 코드로 승인"]
@@ -212,7 +218,7 @@ sequenceDiagram
   U->>F: 역할 코드로 승인
   F->>B: POST /batches/{id}/approve (expected_result_digest)
   B-->>F: APPROVED
-  Note over B,E: 예측·계획 API는 아직 없음
+  Note over B,E: 승인 수요 예측 API 연결 완료, 계획 API는 아직 없음
   B->>E: 승인 데이터로 예측·계획 계산
   E-->>B: plan-export JSON
   U->>F: Excel 다운로드
@@ -350,7 +356,7 @@ flowchart TD
 ## 📦 설치 및 실행
 
 ### 필수 조건
-- Node.js 16 이상
+- Node.js 20 이상 (브라우저 E2E 포함)
 - npm 또는 yarn
 
 ### 설치
@@ -364,7 +370,20 @@ npm install
 ```bash
 npm run dev
 ```
-브라우저에서 `http://localhost:5173` 접속
+브라우저에서 `http://127.0.0.1:5173` 접속. Vite는 이 주소에만 바인딩하며 포트 충돌 시 종료합니다.
+
+백엔드 저장소의 Git 제외 `.env`에 `PERSISTENCE=postgres`, `CORS_ALLOW_ORIGINS=http://127.0.0.1:5173`를 설정하고 API를 127.0.0.1:8000에서 시작합니다. 프론트 `.env.local`에는 `VITE_API_URL=http://127.0.0.1:8000`을 둡니다. DB 비밀번호는 프론트에 넣지 않습니다.
+
+### 검증
+
+```powershell
+npm run type-check
+npm run build
+node node_modules/@playwright/test/cli.js install chromium
+npm run test:e2e
+```
+
+E2E는 sibling `decision-supporter/.venv`를 사용하고 **chungpamo_test의 public 스키마만 초기화**합니다. 실행 중인 충파모 Docker 자원과 고정 loopback 주소·포트·역할을 검사하며, 개발 DB에는 쓰지 않습니다. 테스트 API는 8001, 프론트는 5174를 사용하고 테스트 후 종료합니다. 실제 등록·승인·조회·409 충돌·새로고침·API 프로세스 재시작을 검증합니다. 422/501/503/네트워크 오류 표시 시험에서는 해당 오류 응답만 주입합니다.
 
 ### 빌드
 ```bash

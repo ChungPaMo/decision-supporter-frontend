@@ -1,22 +1,21 @@
 import { ReactNode } from 'react';
-import { allApproved, Step, useProductionStore } from '../store/productionStore';
+import { Step, useProductionStore } from '../store/productionStore';
 
 const STEPS: Array<{ id: Step; label: string }> = [
   { id: 'data', label: '데이터 등록·승인' },
   { id: 'forecast', label: '수요 예측 확인' },
-  { id: 'plans', label: '생산계획 비교' },
-  { id: 'diagnosis', label: '실행 가능성 진단' },
-  { id: 'approval', label: '승인 및 Excel 출력' },
+  { id: 'plans', label: '생산계획 비교 (예시)' },
+  { id: 'diagnosis', label: '실행 가능성 진단 (예시)' },
+  { id: 'approval', label: '승인 및 Excel 출력 (예시)' },
 ];
 
 export default function MainLayout({ children }: { children: ReactNode }) {
-  const { step, setStep, batches, selectedPlanId } = useProductionStore();
+  const { step, setStep, selectedPlanId } = useProductionStore();
   const stepIndex = STEPS.findIndex((item) => item.id === step);
 
   const isOpen = (id: Step) => {
-    if (id === 'data') return true;
-    if (id === 'forecast' || id === 'plans') return allApproved(batches);
-    return allApproved(batches) && selectedPlanId !== null;
+    if (id === 'data' || id === 'forecast' || id === 'plans') return true;
+    return selectedPlanId !== null;
   };
 
   return (
@@ -24,7 +23,7 @@ export default function MainLayout({ children }: { children: ReactNode }) {
       <header className="app-header">
         <div>
           <h1>생산계획 의사결정 시스템</h1>
-          <p>합성 예시 데이터 · 출력물은 DEMO/UNVERIFIED</p>
+          <p>데이터 등록·승인·수요 예측은 실제 서버 저장 · 계획·진단은 별도 예시 · 출력물은 DEMO/UNVERIFIED</p>
         </div>
         <div
           className="app-progress"
@@ -62,7 +61,10 @@ export default function MainLayout({ children }: { children: ReactNode }) {
             ))}
           </ol>
         </nav>
-        <main className={`app-main app-main-${step}`}>{children}</main>
+        <main className={`app-main app-main-${step}`}>
+          {['plans', 'diagnosis', 'approval'].includes(step) && <div className="notice notice-warn">계획·진단·계획 승인은 별도 예시이며 실제 예측 결과와 연결되지 않았습니다.</div>}
+          {children}
+        </main>
       </div>
     </div>
   );

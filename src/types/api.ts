@@ -11,7 +11,7 @@ export interface ApiError {
 export type BatchStatus = 'MAPPING_HOLD' | 'HAS_ERRORS' | 'READY_FOR_APPROVAL' | 'APPROVED' | 'REJECTED';
 export type Entity = 'product' | 'material' | 'bom' | 'inventory' | 'monthly_demand';
 
-export interface BatchDetail {
+export interface BatchSummary {
   batch_id: string;
   entity: Entity;
   status: BatchStatus;
@@ -19,18 +19,30 @@ export interface BatchDetail {
   file: {
     name: string;
     sha256: string;
-    size_bytes: number;
-    format: string;
+    size_bytes: number | null;
+    format: string | null;
   };
-  result_digest: string;
+  result_digest: string | null;
+  settings: { column_overrides: Record<string, string>; default_unit: string | null; sheet: string | null };
+  created_at: string;
   approval_blockers: Array<{ code: string; message: string }>;
-  validation: ValidationResult;
-  approved_by?: string;
-  approved_at?: string;
-  approved_record_count?: number;
-  rejected_by?: string;
-  rejected_at?: string;
-  reject_reason?: string;
+  approved_by?: string | null;
+  approved_at?: string | null;
+  approved_record_count?: number | null;
+  rejected_by?: string | null;
+  rejected_at?: string | null;
+  reject_reason?: string | null;
+}
+
+export interface BatchDetail extends BatchSummary {
+  validation: ValidationResult | null;
+}
+
+export interface Page<T> {
+  items: T[];
+  total: number;
+  limit: number;
+  offset: number;
 }
 
 export interface ValidationResult {
@@ -66,14 +78,14 @@ export interface ValidationIssue {
   severity: 'ERROR' | 'WARNING';
   code: string;
   message: string;
-  field: string;
+  field: string | null;
   location: {
     sheet: string;
-    row: number;
-    col: number;
-    cell_ref: string;
-  };
-  raw_value: string;
+    row: number | null;
+    col: number | null;
+    cell_ref: string | null;
+  } | null;
+  raw_value: string | null;
 }
 
 // 마스터 데이터
